@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="ru" class="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>JurowskiCode</title>
+
+  <!-- TailwindCSS + FontAwesome -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    rel="stylesheet"
+  />
+
+  <!-- CodeMirror 5 + темы -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/codemirror@5.65.13/lib/codemirror.css"
+  />
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/codemirror@5.65.13/theme/dracula.css"
+  />
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/codemirror@5.65.13/theme/monokai.css"
+  />
+  <script src="https://unpkg.com/codemirror@5.65.13/lib/codemirror.js"></script>
+  <script src="https://unpkg.com/codemirror@5.65.13/mode/python/python.js"></script>
+
+  <!-- Pyodide для исполнения кода -->
+  <script src="https://cdn.jsdelivr.net/pyodide/v0.23.4/full/pyodide.js"></script>
+
+  <style>
+      /* Новые шрифты */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+    :root {
+      --bg-light: #f7fafc;
+      --bg-dark: #1e293b;
+    }
+    body {
+      background: var(--bg-light);
+    }
+    .dark body {
+      background: var(--bg-dark);
+    }
+    /* Плавный переход темы */
+    body {
+      transition: background 0.3s;
+    }
+    /* Сайд‑панель чата */
+    #aiChatPanel {
+      transition: transform 0.3s ease;
+      transform: translateX(100%);
+    }
+    #aiChatPanel.open {
+      transform: translateX(0);
+    }
+
+
+    
+    body {
+        font-family: 'Inter', sans-serif;
+    }
+    
+    .font-mono {
+        font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Обновленные цвета */
+    :root {
+        --bg-light: #ffffff;
+        --bg-dark: #0f172a;
+        --primary-500: #6366f1;
+        --primary-600: #4f46e5;
+    }
+
+    /* Навбар */
+    header {
+        height: 64px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    /* Кнопки */
+    button {
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* Редактор */
+    .CodeMirror {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 14px;
+        padding: 1rem 0;
+        height: calc(100vh - 64px - 160px) !important;
+    }
+
+    /* Консоль */
+    #console {
+        height: 160px;
+        background: var(--bg-light);
+        border-color: rgba(226, 232, 240, 0.5);
+        color: #1e293b;
+        font-size: 13px;
+    }
+
+    .dark #console {
+        background: #1e293b;
+        border-color: rgba(30, 41, 59, 0.5);
+        color: #f8fafc;
+    }
+
+    /* Сайдбар */
+    aside {
+        background: #f8fafc;
+        border-color: rgba(226, 232, 240, 0.5);
+    }
+
+    .dark aside {
+        background: #1e293b;
+        border-color: rgba(30, 41, 59, 0.5);
+    }
+
+    input {
+        border-color: #cbd5e1;
+        transition: border-color 0.2s;
+    }
+
+    input:focus {
+        border-color: var(--primary-500);
+        box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+    }
+
+    /* Чат */
+    #aiChatPanel {
+        box-shadow: -4px 0 6px -1px rgba(0, 0, 0, 0.1);
+        z-index: 20;
+    }
+
+    .chat-message {
+        border-radius: 12px;
+        padding: 12px 16px;
+        max-width: 90%;
+    }
+
+    .user-message {
+        background: var(--primary-500);
+        color: white;
+        margin-left: auto;
+    }
+
+    .assistant-message {
+        background: #f1f5f9;
+        color: #0f172a;
+        margin-right: auto;
+    }
+
+    .dark .assistant-message {
+        background: #1e293b;
+        color: #f8fafc;
+    }
+
+    /* Иконки */
+    .button-icon {
+        width: 24px;
+        height: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+  </style>
+</head>
+<body class="flex flex-col h-screen overflow-hidden font-sans">
+
+  <!-- NAVBAR -->
+  <header
+    class="flex items-center justify-between px-6 py-3 bg-white dark:bg-gray-800 shadow"
+  >
+    <h1 class="text-2xl font-bold">JurowskiCode</h1>
+    <div class="flex items-center space-x-3">
+      <button
+        id="themeToggle"
+        class="p-2 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition"
+        title="Переключить тему"
+      >
+        <i id="themeIcon" class="fas fa-moon"></i>
+      </button>
+      <button
+        onclick="removeComments()"
+        class="p-2 rounded hover:bg-red-500 hover:text-white transition"
+        title="Удалить комментарии"
+      >
+        <i class="fas fa-comment-slash"></i>
+      </button>
+      <button
+        onclick="formatCode()"
+        class="p-2 rounded hover:bg-yellow-500 hover:text-white transition"
+        title="Форматировать код"
+      >
+        <i class="fas fa-code"></i>
+      </button>
+      <button
+        onclick="runCode()"
+        class="p-2 rounded hover:bg-green-500 hover:text-white transition"
+        title="Запустить код"
+      >
+        <i class="fas fa-play"></i>
+      </button>
+      <button
+        onclick="saveCode()"
+        class="p-2 rounded hover:bg-blue-500 hover:text-white transition"
+        title="Скачать файл"
+      >
+        <i class="fas fa-download"></i>
+      </button>
+      <button
+        id="aiToggle"
+        class="p-2 rounded hover:bg-indigo-500 hover:text-white transition"
+        title="Чат с AI"
+      >
+        <i class="fas fa-robot"></i>
+      </button>
+    </div>
+  </header>
+
+  <div class="flex flex-1 overflow-hidden">
+    <!-- Sidebar: диапазон строк -->
+    <aside
+      class="w-64 bg-gray-100 dark:bg-gray-700 p-4 border-r dark:border-gray-600"
+    >
+      <div class="mb-4">
+        <label class="block mb-1 font-medium">От строки</label>
+        <input
+          id="startLine"
+          type="number"
+          min="1"
+          class="w-full p-2 border rounded bg-white dark:bg-gray-600"
+          placeholder="1"
+        />
+      </div>
+      <div>
+        <label class="block mb-1 font-medium">До строки</label>
+        <input
+          id="endLine"
+          type="number"
+          min="1"
+          class="w-full p-2 border rounded bg-white dark:bg-gray-600"
+          placeholder="10"
+        />
+      </div>
+    </aside>
+
+    <!-- Редактор + консоль -->
+    <main class="flex flex-col flex-1">
+      <div class="flex-1">
+        <textarea id="editor"></textarea>
+      </div>
+      <div
+        id="console"
+        class="h-40 p-4 bg-gray-100 dark:bg-gray-700 border-t dark:border-gray-600 overflow-y-auto font-mono text-sm"
+      ></div>
+    </main>
+
+    <!-- Панель чата -->
+    <div
+      id="aiChatPanel"
+      class="absolute top-0 right-0 h-full w-80 bg-white dark:bg-gray-800 shadow-lg border-l dark:border-gray-600 flex flex-col"
+    >
+      <header
+        class="flex items-center justify-between px-4 py-2 border-b dark:border-gray-600"
+      >
+        <h2 class="font-semibold">AI‑Чат</h2>
+        <button onclick="toggleChat()">&times;</button>
+      </header>
+      <div
+        id="chatMessages"
+        class="flex-1 p-4 overflow-y-auto space-y-3 text-sm"
+      ></div>
+      <footer class="p-4 border-t dark:border-gray-600">
+        <textarea
+          id="chatInput"
+          rows="2"
+          class="w-full p-2 border rounded bg-gray-100 dark:bg-gray-700"
+          placeholder="Напиши сообщение..."
+        ></textarea>
+        <button
+          onclick="sendChat()"
+          class="mt-2 w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded"
+        >
+          Отправить
+        </button>
+      </footer>
+    </div>
+  </div>
+
+  <script>
+    // === Инициализация CodeMirror ===
+    const editor = CodeMirror.fromTextArea(
+      document.getElementById("editor"),
+      {
+        mode: "python",
+        theme: "dracula",
+        lineNumbers: true,
+        indentUnit: 4,
+        autofocus: true,
+      }
+    );
+
+    // === Тема ===
+    const themeToggle = document.getElementById("themeToggle");
+    const themeIcon = document.getElementById("themeIcon");
+    function updateThemeIcon() {
+      if (document.documentElement.classList.contains("dark")) {
+        themeIcon.className = "fas fa-sun";
+      } else {
+        themeIcon.className = "fas fa-moon";
+      }
+    }
+    themeToggle.onclick = () => {
+      document.documentElement.classList.toggle("dark");
+      localStorage.theme = document.documentElement.classList.contains("dark")
+        ? "dark"
+        : "light";
+      editor.setOption(
+        "theme",
+        editor.getOption("theme") === "dracula" ? "monokai" : "dracula"
+      );
+      updateThemeIcon();
+    };
+    // Инициалный значок
+    updateThemeIcon();
+
+    // === Удаление комментариев ===
+    function removeComments() {
+      const s = +startLine.value - 1,
+        e = +endLine.value - 1,
+        total = editor.lineCount();
+      if (s < 0 || e >= total || s > e) return alert("Неверный диапазон");
+      editor.operation(() => {
+        for (let i = s; i <= e; i++) {
+          const txt = editor.getLine(i).replace(/#.*/g, "");
+          editor.replaceRange(txt, { line: i, ch: 0 }, { line: i, ch: Infinity });
+        }
+      });
+    }
+
+    // === Pyodide ===
+    let pyodide, ready = false;
+    (async () => {
+      pyodide = await loadPyodide();
+      await pyodide.loadPackage("micropip");
+      await pyodide.runPythonAsync(`
+import micropip
+await micropip.install('autopep8')
+`);
+      ready = true;
+    })();
+
+    // === Запустить код ===
+    async function runCode() {
+      if (!ready) return alert("Ждём Python...");
+      const code = editor.getValue();
+      const outEl = document.getElementById("console");
+      outEl.textContent = "";
+      try {
+        const result = await pyodide.runPythonAsync(`
+from io import StringIO
+import sys
+buf=StringIO()
+sys.stdout=buf; sys.stderr=buf
+${code}
+buf.getvalue()
+`);
+        outEl.textContent = result;
+      } catch (err) {
+        outEl.textContent = err;
+      }
+    }
+
+    // === Форматирование ===
+    async function formatCode() {
+      if (!ready) return alert("Ждём Python...");
+      const src = editor.getValue();
+      const fixed = await pyodide.runPythonAsync(`
+import autopep8
+autopep8.fix_code(${JSON.stringify(src)}, options={'aggressive':1,'max_line_length':88})
+`);
+      editor.setValue(fixed);
+    }
+
+    // === Сохранить файл ===
+    function saveCode() {
+      const blob = new Blob([editor.getValue()], { type: "text/plain" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "script.py";
+      a.click();
+    }
+
+    // === Чат AI ===
+   const aiPanel = document.getElementById("aiChatPanel");
+const chatButton = document.getElementById("aiToggle");
+const inputBox = document.getElementById("chatInput");
+const messagesBox = document.getElementById("chatMessages");
+
+chatButton?.addEventListener("click", toggleChat);
+inputBox?.addEventListener("keypress", (e) => {
+  if (e.key === "Enter") sendChat();
+});
+
+function toggleChat() {
+  aiPanel?.classList.toggle("open");
+}
+
+async function sendChat() {
+  const msg = inputBox.value.trim();
+  if (!msg) return;
+
+  appendMsg("user", msg);
+  inputBox.value = "";
+
+  const history = Array.from(messagesBox.querySelectorAll("div")).map((d) => ({
+    role: d.classList.contains("user") ? "user" : "assistant",
+    content: d.textContent,
+  }));
+
+  try {
+    const resp = await fetch("https://api.together.ai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer 73532256927db281cb8ba852d4a2f8fc73e95428f04b8118300c4adfa74d5dbb",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
+        messages: [
+          { role: "system", content: "Ты — профессионал математики физики и информатики" },
+          ...history,
+          { role: "user", content: msg },
+        ],
+      }),
+    });
+
+    if (!resp.ok) {
+      throw new Error(`Ошибка: ${resp.statusText}`);
+    }
+
+    const data = await resp.json();
+    const answer = data.choices?.[0]?.message?.content || "Ответ пустой";
+    appendMsg("assistant", answer);
+  } catch (err) {
+    appendMsg("assistant", "⚠️ Ошибка при запросе к AI: " + err.message);
+  }
+}
+
+function appendMsg(role, text) {
+  const div = document.createElement("div");
+  div.className = role;
+  div.textContent = text;
+
+  const commonClasses = ["p-2", "my-1", "max-w-[80%]", "break-words"];
+  const userClasses = ["bg-blue-600", "text-white", "rounded-lg", "ml-auto", "text-right"];
+  const aiClasses = ["bg-gray-700", "text-white", "rounded-lg", "mr-auto", "text-left"];
+
+  div.classList.add(...commonClasses, ...(role === "user" ? userClasses : aiClasses));
+  document.getElementById("chatMessages").append(div);
+  aiPanel.scrollTop = aiPanel.scrollHeight;
+}
+
+
+  </script>
+</body>
+</html>
